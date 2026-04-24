@@ -1,0 +1,15 @@
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: #eaf1e1;
+  color: #1f2a1e;
+  font-family: 'Gaegu', 'Quicksand', 'Pretendard', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button { font-family: inherit; }
+input { font-family: inherit; }

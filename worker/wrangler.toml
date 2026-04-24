@@ -1,0 +1,20 @@
+name = "calorieview-api"
+main = "src/index.ts"
+compatibility_date = "2025-07-18"
+compatibility_flags = ["nodejs_compat"]
+
+# Secrets (set via wrangler secret put <NAME>):
+#   GEMINI_API_KEY
+#   MFDS_API_KEY (optional)
+
+[vars]
+GEMINI_MODEL = "gemini-2.5-flash-lite"
+SUPABASE_URL = "https://nqfxvbjddqntxwipttaa.supabase.co"
+SUPABASE_ANON_KEY = "sb_publishable_ugS2dUBiwiOPwEIs_wRpcg_Va3xtCI6"
+
+# Optional KV cache for identical-image dedup
+# 1) wrangler kv namespace create IMG_CACHE
+# 2) paste the id below and uncomment
+# [[kv_namespaces]]
+# binding = "IMG_CACHE"
+# id = ""

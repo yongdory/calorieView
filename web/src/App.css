@@ -1,0 +1,50 @@
+:root {
+  --paper: #eaf1e1;
+  --paper-deep: #d9e5c9;
+  --card: #f5f9ee;
+  --card-alt: #d7e6bd;
+  --ink: #1f2a1e;
+  --ink70: rgba(31, 42, 30, 0.70);
+  --ink55: rgba(31, 42, 30, 0.55);
+  --ink40: rgba(31, 42, 30, 0.40);
+  --ink15: rgba(31, 42, 30, 0.15);
+  --ink08: rgba(31, 42, 30, 0.08);
+  --vita: #6bbf8a;
+  --carb: #f4b942;
+  --protein: #e07a5f;
+  --fat: #c79fe0;
+  --font-sans: 'Gaegu', 'Quicksand', 'Pretendard', system-ui, sans-serif;
+  --font-display: 'Gaegu', 'Fredoka', cursive;
+  --font-num: 'Fredoka', 'Gaegu', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.cal {
+  font-family: var(--font-sans);
+  color: var(--ink);
+  line-height: 1.45;
+}
+.cal-display { font-family: var(--font-display); }
+.cal-num { font-family: var(--font-num); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.cal-mono { font-family: var(--font-mono); }
+
+.cal-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.cal-scroll::-webkit-scrollbar { display: none; }
+
+@keyframes cal-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+.cal-pulse { animation: cal-pulse 1.4s ease-in-out infinite; }
+
+@keyframes cal-spin { to { transform: rotate(360deg); } }
+.cal-spin { animation: cal-spin 1.2s linear infinite; }
+
+@keyframes cal-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+.cal-bob { animation: cal-bob 2.4s ease-in-out infinite; }
