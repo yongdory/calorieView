@@ -123,6 +123,79 @@ function jsonResponse(body: unknown, status = 200, extra: Record<string, string>
   });
 }
 
+async function fetchKakaoAppFriends(accessToken: string): Promise<string[]> {
+  const ids: string[] = [];
+  let url: string | null = 'https://kapi.kakao.com/v1/api/talk/friends?limit=100';
+  while (url) {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`Kakao friends ${res.status}: ${txt.slice(0, 200)}`);
+    }
+    const data = await res.json() as {
+      elements?: Array<{ id: number | string }>;
+      after_url?: string | null;
+    };
+    for (const el of data.elements ?? []) ids.push(String(el.id));
+    url = data.after_url ?? null;
+  }
+  return ids;
+}
+
+async function syncFriendships(env: Env, userId: string, kakaoFriendIds: string[]): Promise<{ matched: number; added: number }> {
+  const headers = {
+    Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+    apikey: env.SUPABASE_SERVICE_ROLE_KEY!,
+    'Content-Type': 'application/json',
+  };
+
+  if (kakaoFriendIds.length === 0) {
+    await fetch(`${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
+      method: 'PATCH', headers,
+      body: JSON.stringify({ kakao_friends_synced_at: new Date().toISOString() }),
+    });
+    return { matched: 0, added: 0 };
+  }
+
+  const inList = kakaoFriendIds.map(s => `"${s}"`).join(',');
+  const profRes = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/profiles?select=id,kakao_id&kakao_id=in.(${inList})`,
+    { headers },
+  );
+  if (!profRes.ok) throw new Error(`profiles lookup ${profRes.status}: ${await profRes.text()}`);
+  const matched = await profRes.json() as Array<{ id: string; kakao_id: string }>;
+  const matchedIds = matched.map(p => p.id).filter(id => id !== userId);
+
+  if (matchedIds.length === 0) {
+    await fetch(`${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
+      method: 'PATCH', headers,
+      body: JSON.stringify({ kakao_friends_synced_at: new Date().toISOString() }),
+    });
+    return { matched: 0, added: 0 };
+  }
+
+  const rows = matchedIds.flatMap(fid => [
+    { user_id: userId, friend_id: fid, source: 'kakao' },
+    { user_id: fid, friend_id: userId, source: 'kakao' },
+  ]);
+  const insertRes = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/friendships?on_conflict=user_id,friend_id`,
+    {
+      method: 'POST',
+      headers: { ...headers, Prefer: 'resolution=ignore-duplicates,return=minimal' },
+      body: JSON.stringify(rows),
+    },
+  );
+  if (!insertRes.ok) throw new Error(`friendships insert ${insertRes.status}: ${await insertRes.text()}`);
+
+  await fetch(`${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
+    method: 'PATCH', headers,
+    body: JSON.stringify({ kakao_friends_synced_at: new Date().toISOString() }),
+  });
+
+  return { matched: matchedIds.length, added: rows.length };
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method === 'OPTIONS') {
@@ -150,6 +223,26 @@ export default {
       });
       if (!res.ok) return jsonResponse({ error: `delete failed: ${res.status}` }, 500);
       return jsonResponse({ ok: true });
+    }
+
+    if (url.pathname === '/friends/sync' && request.method === 'POST') {
+      const user = await verifyUser(env, request);
+      if (!user) return jsonResponse({ error: 'unauthorized' }, 401);
+      if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+        return jsonResponse({ error: 'SUPABASE_SERVICE_ROLE_KEY not configured' }, 500);
+      }
+      try {
+        const { kakaoAccessToken } = await request.json() as { kakaoAccessToken?: string };
+        if (!kakaoAccessToken) return jsonResponse({ error: 'kakaoAccessToken required' }, 400);
+
+        const kakaoFriendIds = await fetchKakaoAppFriends(kakaoAccessToken);
+        const result = await syncFriendships(env, user.id, kakaoFriendIds);
+        return jsonResponse({ ok: true, ...result });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'unknown';
+        console.error('/friends/sync error:', msg);
+        return jsonResponse({ error: msg }, 500);
+      }
     }
 
     if (url.pathname === '/analyze' && request.method === 'POST') {

@@ -33,11 +33,29 @@ export async function analyzeFoodImage(file: File): Promise<AnalyzeResponse> {
   if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
   const result = (await res.json()) as AnalyzeResponse;
 
-  await saveMeal(result, await hashString(imageBase64));
+  const imageHash = await hashString(imageBase64);
+  const imageUrl = await uploadMealImage(resized, imageHash);
+  await saveMeal(result, imageHash, imageUrl);
   return result;
 }
 
-async function saveMeal(r: AnalyzeResponse, imageHash: string): Promise<void> {
+async function uploadMealImage(blob: Blob, hash: string): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const path = `${user.id}/${Date.now()}_${hash.slice(0, 12)}.jpg`;
+  const { error } = await supabase.storage.from('meals').upload(path, blob, {
+    contentType: 'image/jpeg',
+    upsert: false,
+  });
+  if (error) {
+    console.warn('image upload failed', error);
+    return null;
+  }
+  const { data } = supabase.storage.from('meals').getPublicUrl(path);
+  return data.publicUrl ?? null;
+}
+
+async function saveMeal(r: AnalyzeResponse, imageHash: string, imageUrl: string | null): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
   const { error } = await supabase.from('meals').insert({
@@ -48,6 +66,7 @@ async function saveMeal(r: AnalyzeResponse, imageHash: string): Promise<void> {
     total_fat_g: r.totals.fatG,
     items: r.items,
     image_hash: imageHash,
+    image_url: imageUrl,
   });
   if (error) console.warn('meal save failed', error);
 }

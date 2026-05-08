@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { rememberKakaoToken } from '../lib/friends';
 import { tokens as T } from '../lib/tokens';
 import { BigBtn } from './ui/primitives';
 
@@ -15,10 +16,12 @@ export function AuthGate({ children }: Props) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
+      rememberKakaoToken(data.session?.provider_token ?? null);
       setReady(true);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
+      rememberKakaoToken(s?.provider_token ?? null);
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -63,6 +66,25 @@ function AuthForm() {
     }
   }
 
+  async function signInWithKakao() {
+    setErr(null);
+    setMsg(null);
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'kakao',
+        options: {
+          redirectTo: window.location.origin,
+          scopes: 'profile_nickname profile_image',
+        },
+      });
+      if (error) throw error;
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : '카카오 로그인 실패');
+      setLoading(false);
+    }
+  }
+
   const inputStyle: React.CSSProperties = {
     width: '100%',
     padding: '14px 18px',
@@ -95,6 +117,38 @@ function AuthForm() {
         <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="cal-display" style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>
             {mode === 'signin' ? '다시 만나서 반가워요' : '처음이시군요 🌿'}
+          </div>
+
+          <button
+            type="button"
+            onClick={signInWithKakao}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '14px 18px',
+              fontSize: 15,
+              fontFamily: T.font.sans,
+              fontWeight: 700,
+              color: '#3B1E1E',
+              background: '#FEE500',
+              border: 'none',
+              borderRadius: T.radius.md,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 18 }}>💬</span>
+            카카오로 시작하기
+          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0' }}>
+            <div style={{ flex: 1, height: 1, background: T.color.ink08 }} />
+            <div style={{ fontSize: 11, color: T.color.ink55, fontWeight: 700 }}>또는 이메일</div>
+            <div style={{ flex: 1, height: 1, background: T.color.ink08 }} />
           </div>
 
           <input

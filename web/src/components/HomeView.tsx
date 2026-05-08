@@ -4,6 +4,7 @@ import type { MacroTargets } from '../lib/nutrition';
 import { tokens as T } from '../lib/tokens';
 import { MultiRing } from './ui/Ring';
 import { Card, Chip, IconBtn, FoodImg } from './ui/primitives';
+import { PhotoModal } from './PhotoModal';
 
 interface MealRow {
   id: string;
@@ -13,6 +14,7 @@ interface MealRow {
   total_protein_g: number;
   total_fat_g: number;
   items: Array<{ name: string; kcal: number; estimatedGrams: number }>;
+  image_url: string | null;
 }
 
 const foodEmoji = (name: string): string => {
@@ -36,21 +38,21 @@ interface Props {
   targets: MacroTargets;
   onPickPhoto: () => void;
   onOpenHistory: () => void;
-  onSignOut: () => void;
-  onDeleteAccount: () => void;
+  onOpenFriends: () => void;
+  onOpenSettings: () => void;
   refreshKey: number;
 }
 
-export function HomeView({ email, nickname, targets, onPickPhoto, onOpenHistory, onSignOut, onDeleteAccount, refreshKey }: Props) {
+export function HomeView({ email: _email, nickname, targets, onPickPhoto, onOpenHistory, onOpenFriends, onOpenSettings, refreshKey }: Props) {
   const [meals, setMeals] = useState<MealRow[]>([]);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [photoSrc, setPhotoSrc] = useState<string | null>(null);
 
   useEffect(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     supabase
       .from('meals')
-      .select('id, eaten_at, total_kcal, total_carb_g, total_protein_g, total_fat_g, items')
+      .select('id, eaten_at, total_kcal, total_carb_g, total_protein_g, total_fat_g, items, image_url')
       .gte('eaten_at', today.toISOString())
       .order('eaten_at', { ascending: false })
       .then(({ data }) => setMeals((data as MealRow[]) ?? []));
@@ -78,6 +80,19 @@ export function HomeView({ email, nickname, targets, onPickPhoto, onOpenHistory,
   const prefix = nickname ? `${nickname}님, ` : '';
   const greet = meals.length === 0 ? `${prefix}오늘 첫 식사 어땠어요?` : left === 0 ? `${prefix}오늘도 잘 해냈어요 🎉` : `${prefix}오늘도 천천히 🍃`;
 
+  async function shareToday() {
+    const pct = Math.round((totals.kcal / Math.max(1, targets.kcal)) * 100);
+    const head = nickname ? `${nickname}님의 오늘 식단` : '오늘 식단';
+    const text = `${head}\n${totals.kcal.toLocaleString()} / ${targets.kcal.toLocaleString()} kcal (${pct}%)\n탄 ${totals.carb}g · 단 ${totals.protein}g · 지 ${totals.fat}g\n\ncalorieView`;
+    const nav = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
+    if (typeof nav.share === 'function') {
+      try { await nav.share({ title: 'calorieView', text, url: window.location.origin }); return; }
+      catch { /* user cancel / unsupported → fall through to clipboard */ }
+    }
+    try { await navigator.clipboard.writeText(text); alert('오늘 식단을 클립보드에 복사했어요'); }
+    catch { alert('공유를 지원하지 않는 환경이에요'); }
+  }
+
   return (
     <div className="cal" style={{ minHeight: '100vh', background: T.color.paper, position: 'relative' }}>
       <div className="cal-scroll" style={{ maxWidth: 460, margin: '0 auto', padding: '16px 0 140px' }}>
@@ -87,47 +102,12 @@ export function HomeView({ email, nickname, targets, onPickPhoto, onOpenHistory,
             <div style={{ fontSize: 12, color: T.color.ink55, fontWeight: 700 }}>{dateLabel}</div>
             <div className="cal-display" style={{ fontSize: 24, fontWeight: 700, marginTop: 2 }}>{greet}</div>
           </div>
-          <div style={{ position: 'relative' }}>
-            <IconBtn size={38} onClick={() => setMenuOpen(o => !o)}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="8" r="4" />
-                <path d="M4 22c0-4.4 3.6-8 8-8s8 3.6 8 8" />
-              </svg>
-            </IconBtn>
-            {menuOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: 46,
-                  minWidth: 180,
-                  background: T.color.card,
-                  border: `1px solid ${T.color.ink08}`,
-                  borderRadius: T.radius.md,
-                  boxShadow: T.shadow.md,
-                  padding: 8,
-                  zIndex: 20,
-                }}
-              >
-                <div style={{ padding: '6px 10px', fontSize: 12, color: T.color.ink55, fontWeight: 700, wordBreak: 'break-all' }}>{email}</div>
-                <div style={{ height: 1, background: T.color.ink08, margin: '6px 0' }} />
-                <button
-                  type="button"
-                  onClick={() => { setMenuOpen(false); onSignOut(); }}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', background: 'transparent', border: 'none', color: T.color.ink, fontSize: 13, fontWeight: 700, borderRadius: T.radius.sm, cursor: 'pointer' }}
-                >
-                  로그아웃
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setMenuOpen(false); onDeleteAccount(); }}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', background: 'transparent', border: 'none', color: T.color.protein, fontSize: 13, fontWeight: 700, borderRadius: T.radius.sm, cursor: 'pointer' }}
-                >
-                  계정 삭제
-                </button>
-              </div>
-            )}
-          </div>
+          <IconBtn size={38} onClick={onOpenSettings}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </IconBtn>
         </div>
 
         {/* big ring card */}
@@ -177,9 +157,10 @@ export function HomeView({ email, nickname, targets, onPickPhoto, onOpenHistory,
 
         {/* quick actions */}
         <div style={{ padding: '0 18px 14px', display: 'flex', gap: 8 }}>
-          <QuickBtn emoji="📷" label="사진으로" onClick={onPickPhoto} />
-          <QuickBtn emoji="📊" label="기록 보기" onClick={onOpenHistory} />
-          <QuickBtn emoji="⭐" label="즐겨찾기" disabled />
+          <QuickBtn emoji="📷" label="업로드" onClick={onPickPhoto} />
+          <QuickBtn emoji="📊" label="기록" onClick={onOpenHistory} />
+          <QuickBtn emoji="👥" label="친구" onClick={onOpenFriends} />
+          <QuickBtn emoji="💭" label="공유" onClick={shareToday} />
         </div>
 
         {/* meals */}
@@ -202,7 +183,12 @@ export function HomeView({ email, nickname, targets, onPickPhoto, onOpenHistory,
             const moreLabel = (m.items?.length ?? 0) > 1 ? ` 외 ${m.items.length - 1}` : '';
             return (
               <Card key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 10, boxShadow: 'none' }}>
-                <FoodImg emoji={foodEmoji(label)} size={52} radius={18} />
+                <div
+                  onClick={m.image_url ? () => setPhotoSrc(m.image_url!) : undefined}
+                  style={{ cursor: m.image_url ? 'zoom-in' : 'default' }}
+                >
+                  <FoodImg src={m.image_url ?? undefined} emoji={foodEmoji(label)} size={52} radius={18} />
+                </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="cal-mono" style={{ fontSize: 10, color: T.color.ink55, fontWeight: 700 }}>{time}</div>
                   <div style={{ fontSize: 14, fontWeight: 700, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -231,9 +217,10 @@ export function HomeView({ email, nickname, targets, onPickPhoto, onOpenHistory,
         )}
 
         <div style={{ padding: '18px 22px 0', textAlign: 'center', fontSize: 11, color: T.color.ink40 }}>
-          <Chip sm>AI 추정엔 ±30% 오차가 있어요</Chip>
+          <Chip sm>AI 추정엔 ±18% 오차가 있어요.(향후 모델 업그레이드 예정)</Chip>
         </div>
       </div>
+      {photoSrc && <PhotoModal src={photoSrc} onClose={() => setPhotoSrc(null)} />}
     </div>
   );
 }

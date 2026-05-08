@@ -1,12 +1,12 @@
 # calorieView
 
-음식 사진을 업로드하면 Gemini 1.5 Flash-8B가 분석하여 탄수화물/단백질/지방 수치와 하루 권장 칼로리 대비 %를 보여주는 웹+하이브리드 앱.
+음식 사진을 업로드하면 Gemini 2.5 Flash-Lite가 분석하여 탄수화물/단백질/지방 수치와 하루 권장 칼로리 대비 %를 보여주는 웹+하이브리드 앱.
 
 ## 스택
 
 - **Frontend**: React + Vite + TypeScript (Capacitor로 iOS/Android 래핑)
 - **Backend API**: Cloudflare Workers (`worker/`)
-- **LLM**: Google Gemini 1.5 Flash-8B
+- **LLM**: Google Gemini 2.5 Flash-Lite
 - **DB / Auth**: Supabase (Postgres + Auth + RLS)
 
 ## 폴더 구조
@@ -86,19 +86,19 @@ npx wrangler pages deploy dist --project-name calorieview
 - `profiles` — 사용자 프로필 (가입 시 자동 생성)
 - `meals` — 식사 분석 기록 (RLS로 본인 것만 접근)
 
-## 비용 (MAU 1천 기준 예상)
+## 비용 (테스트 단계 기준)
 
 | 항목 | 월 예상 |
 |---|---|
 | Cloudflare Workers | $0 (무료 10만 req/일) |
 | Cloudflare Pages | $0 |
 | Supabase | $0 (무료 티어) |
-| Gemini 1.5 Flash-8B | ~$2 (하루 3장 × 1000명) |
-| **총** | **~$2** |
+| Gemini 2.5 Flash-Lite | ~$0 (테스트, 무료 티어 내) |
+| **총** | **~$0** |
 
 ## 주의
 
-- LLM 영양 추정은 ±30% 오차 가능 → "참고용" UI 표기 필수
+- LLM 영양 추정은 ±18% 오차 가능(향후 모델 업그레이드 예정) → "참고용" UI 표기 필수
 - 앱스토어 출시 전 필수:
   - 개인정보처리방침 (`web/public/privacy.html` — 이메일 수정 필요)
   - 계정 삭제 기능 (구현됨)

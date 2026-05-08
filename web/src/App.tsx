@@ -9,6 +9,10 @@ import { HistoryView } from './components/HistoryView';
 import { LoadingView } from './components/LoadingView';
 import { ResultView } from './components/ResultView';
 import { Onboarding } from './components/Onboarding';
+import { FriendsView } from './components/FriendsView';
+import { FriendDayView } from './components/FriendDayView';
+import { Settings } from './components/Settings';
+import type { FriendSummary } from './lib/friends';
 import { tokens as T } from './lib/tokens';
 import './App.css';
 
@@ -21,6 +25,9 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8787';
 type Stage =
   | { kind: 'home' }
   | { kind: 'history' }
+  | { kind: 'friends' }
+  | { kind: 'friend-day'; friend: FriendSummary }
+  | { kind: 'settings' }
   | { kind: 'loading'; previewSrc: string }
   | { kind: 'result'; previewSrc: string; result: AnalyzeResponse }
   | { kind: 'error'; message: string };
@@ -108,13 +115,35 @@ function Shell({ userId, email }: { userId: string; email: string }) {
           targets={targets}
           onPickPhoto={openPicker}
           onOpenHistory={() => setStage({ kind: 'history' })}
+          onOpenFriends={() => setStage({ kind: 'friends' })}
+          onOpenSettings={() => setStage({ kind: 'settings' })}
+          refreshKey={refreshKey}
+        />
+      )}
+      {stage.kind === 'settings' && profile && (
+        <Settings
+          profile={profile}
+          email={email}
+          onBack={() => setStage({ kind: 'home' })}
+          onProfileChanged={() => fetchProfile(userId).then(p => p && setProfile(p))}
           onSignOut={signOut}
           onDeleteAccount={deleteAccount}
-          refreshKey={refreshKey}
         />
       )}
       {stage.kind === 'history' && (
         <HistoryView targets={targets} onBack={() => setStage({ kind: 'home' })} />
+      )}
+      {stage.kind === 'friends' && (
+        <FriendsView
+          onBack={() => setStage({ kind: 'home' })}
+          onOpenFriendDay={(friend) => setStage({ kind: 'friend-day', friend })}
+        />
+      )}
+      {stage.kind === 'friend-day' && (
+        <FriendDayView
+          friend={stage.friend}
+          onBack={() => setStage({ kind: 'friends' })}
+        />
       )}
       {stage.kind === 'loading' && <LoadingView previewSrc={stage.previewSrc} />}
       {stage.kind === 'result' && (

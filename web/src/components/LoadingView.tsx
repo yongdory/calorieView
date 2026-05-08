@@ -67,7 +67,7 @@ export function LoadingView({ previewSrc }: { previewSrc?: string | null }) {
       <div style={{ marginTop: 28, padding: 14, borderRadius: T.radius.md, background: T.color.card, border: `1px solid ${T.color.ink08}`, fontSize: 13, color: T.color.ink70, display: 'flex', gap: 10, maxWidth: 360 }}>
         <div style={{ fontSize: 20 }}>💡</div>
         <div>
-          AI 추정엔 <b>±30% 오차</b>가 있을 수 있어요. 결과는 참고용으로 사용하세요.
+          AI 추정엔 <b>±18% 오차</b>가 있을 수 있어요. 향후 모델 업그레이드 예정이며, 결과는 참고용으로 사용하세요.
         </div>
       </div>
     </div>
