@@ -75,7 +75,7 @@ function AuthForm() {
         provider: 'kakao',
         options: {
           redirectTo: window.location.origin,
-          scopes: 'profile_nickname profile_image',
+          scopes: 'profile_nickname profile_image friends',
         },
       });
       if (error) throw error;

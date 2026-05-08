@@ -20,7 +20,10 @@ const FALLBACK_TARGETS = dailyMacroTargets({
   sex: 'male', ageYears: 30, weightKg: 70, heightCm: 175, activity: 'light',
 });
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8787';
+const API_BASE = import.meta.env.VITE_API_BASE_URL
+  ?? (typeof window !== 'undefined' && window.location.hostname === 'localhost'
+        ? 'http://localhost:8787'
+        : 'https://calorieview-api.yongdory.workers.dev');
 
 type Stage =
   | { kind: 'home' }

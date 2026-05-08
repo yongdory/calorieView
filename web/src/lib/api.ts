@@ -14,7 +14,10 @@ export interface AnalyzeResponse {
   totals: { kcal: number; carbG: number; proteinG: number; fatG: number };
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8787';
+const API_BASE = import.meta.env.VITE_API_BASE_URL
+  ?? (typeof window !== 'undefined' && window.location.hostname === 'localhost'
+        ? 'http://localhost:8787'
+        : 'https://calorieview-api.yongdory.workers.dev');
 
 export async function analyzeFoodImage(file: File): Promise<AnalyzeResponse> {
   const resized = await resizeImage(file, 768);
