@@ -1,9 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { tokens as T } from '../lib/tokens';
 import { BigBtn, Card, IconBtn, Label } from './ui/primitives';
 import { syncKakaoFriends, getKakaoToken } from '../lib/friends';
 import type { ProfileRow } from '../lib/profile';
+import { dailyKcalTarget, type UserProfile } from '../lib/nutrition';
+
+const ACTIVITY_LABEL: Record<UserProfile['activity'], string> = {
+  sedentary: '거의 안 움직임',
+  light: '가벼움',
+  moderate: '보통',
+  active: '많이 움직임',
+};
 
 interface Props {
   profile: ProfileRow;
@@ -130,6 +138,9 @@ export function Settings({ profile, email, onBack, onProfileChanged, onSignOut, 
           </Card>
         </div>
 
+        {/* 신체 정보 */}
+        <BodySection profile={profile} onSaved={() => { setMsg('신체 정보를 저장했어요'); onProfileChanged(); }} />
+
         {/* 공유 */}
         <div style={{ padding: '4px 18px 12px' }}>
           <Label style={{ padding: '0 4px 8px' }}>공유</Label>
@@ -236,5 +247,195 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
         transition: 'left 0.2s',
       }} />
     </button>
+  );
+}
+
+function BodySection({ profile, onSaved }: { profile: ProfileRow; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [sex, setSex] = useState<UserProfile['sex']>(profile.sex ?? 'male');
+  const [age, setAge] = useState<number>(profile.age_years ?? 30);
+  const [height, setHeight] = useState<number>(profile.height_cm ? Number(profile.height_cm) : 170);
+  const [weight, setWeight] = useState<number>(profile.weight_kg ? Number(profile.weight_kg) : 65);
+  const [activity, setActivity] = useState<UserProfile['activity']>(profile.activity ?? 'light');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSex(profile.sex ?? 'male');
+    setAge(profile.age_years ?? 30);
+    setHeight(profile.height_cm ? Number(profile.height_cm) : 170);
+    setWeight(profile.weight_kg ? Number(profile.weight_kg) : 65);
+    setActivity(profile.activity ?? 'light');
+  }, [profile]);
+
+  const kcal = dailyKcalTarget({ sex, ageYears: age, weightKg: weight, heightCm: height, activity });
+
+  async function save() {
+    setSaving(true); setErr(null);
+    const { error } = await supabase.from('profiles').update({
+      sex, age_years: age, height_cm: height, weight_kg: weight,
+      activity, daily_kcal_target: kcal,
+    }).eq('id', profile.id);
+    setSaving(false);
+    if (error) { setErr(error.message); return; }
+    setEditing(false);
+    onSaved();
+  }
+
+  function cancel() {
+    setEditing(false);
+    setErr(null);
+  }
+
+  return (
+    <div style={{ padding: '4px 18px 12px' }}>
+      <Label style={{ padding: '0 4px 8px' }}>신체 정보</Label>
+      <Card style={{ padding: 16, boxShadow: 'none' }}>
+        {!editing ? (
+          <div>
+            <ReadRow label="성별" value={sex === 'male' ? '남성' : '여성'} />
+            <ReadRow label="나이" value={`${age}세`} />
+            <ReadRow label="키" value={`${height}cm`} />
+            <ReadRow label="체중" value={`${weight}kg`} />
+            <ReadRow label="활동량" value={ACTIVITY_LABEL[activity]} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, padding: '10px 12px', background: T.color.vitaSoft, borderRadius: T.radius.sm }}>
+              <span style={{ fontSize: 11, color: T.color.ink55, fontWeight: 700 }}>하루 권장</span>
+              <span className="cal-num" style={{ fontSize: 18, fontWeight: 700 }}>{kcal.toLocaleString()}</span>
+              <span style={{ fontSize: 11, color: T.color.ink55, fontWeight: 700 }}>kcal</span>
+              <div style={{ flex: 1 }} />
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                style={{
+                  padding: '6px 14px', borderRadius: T.radius.pill,
+                  background: T.color.ink, color: T.color.paper,
+                  border: 'none', fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >수정</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <Field label="성별">
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['male', 'female'] as const).map(s => (
+                  <button
+                    key={s} type="button" onClick={() => setSex(s)}
+                    style={{
+                      flex: 1, padding: '10px 8px', borderRadius: T.radius.sm,
+                      background: sex === s ? T.color.vitaSoft : T.color.paper,
+                      border: `1.5px solid ${sex === s ? T.color.vita : T.color.ink08}`,
+                      fontWeight: 700, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer',
+                      color: T.color.ink,
+                    }}
+                  >{s === 'male' ? '👨 남성' : '👩 여성'}</button>
+                ))}
+              </div>
+            </Field>
+            <NumField label="나이" value={age} setValue={setAge} unit="세" min={12} max={100} step={1} />
+            <NumField label="키" value={height} setValue={setHeight} unit="cm" min={120} max={220} step={0.1} decimals={1} />
+            <NumField label="체중" value={weight} setValue={setWeight} unit="kg" min={30} max={200} step={0.1} decimals={1} />
+            <Field label="활동량">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {(Object.keys(ACTIVITY_LABEL) as Array<UserProfile['activity']>).map(a => (
+                  <button
+                    key={a} type="button" onClick={() => setActivity(a)}
+                    style={{
+                      padding: '10px 12px', borderRadius: T.radius.sm, textAlign: 'left',
+                      background: activity === a ? T.color.vitaSoft : T.color.paper,
+                      border: `1.5px solid ${activity === a ? T.color.vita : T.color.ink08}`,
+                      fontWeight: 700, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer',
+                      color: T.color.ink,
+                    }}
+                  >{ACTIVITY_LABEL[a]}</button>
+                ))}
+              </div>
+            </Field>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 12px', background: T.color.vitaSoft, borderRadius: T.radius.sm }}>
+              <span style={{ fontSize: 11, color: T.color.ink55, fontWeight: 700 }}>새 하루 권장</span>
+              <span className="cal-num" style={{ fontSize: 18, fontWeight: 700 }}>{kcal.toLocaleString()}</span>
+              <span style={{ fontSize: 11, color: T.color.ink55, fontWeight: 700 }}>kcal</span>
+            </div>
+            {err && <div style={{ fontSize: 12, color: T.color.protein, fontWeight: 700 }}>{err}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <BigBtn variant="ghost" onClick={cancel} style={{ flex: 1 }}>취소</BigBtn>
+              <BigBtn variant="accent" onClick={save} disabled={saving} style={{ flex: 2 }}>
+                {saving ? '저장 중...' : '저장'}
+              </BigBtn>
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function ReadRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13 }}>
+      <span style={{ color: T.color.ink55, fontWeight: 700 }}>{label}</span>
+      <span style={{ fontWeight: 700 }}>{value}</span>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: T.color.ink70, marginBottom: 6 }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function NumField({ label, value, setValue, unit, min, max, step, decimals = 0 }: {
+  label: string; value: number; setValue: (v: number) => void;
+  unit: string; min: number; max: number; step: number; decimals?: number;
+}) {
+  const round = (v: number) => Math.round(v * 10 ** decimals) / 10 ** decimals;
+  const clamp = (v: number) => Math.min(max, Math.max(min, v));
+  const [draft, setDraft] = useState<string>(String(value));
+  useEffect(() => { setDraft(String(value)); }, [value]);
+
+  const stepAndSet = (n: number) => {
+    const v = round(clamp(n)); setValue(v); setDraft(String(v));
+  };
+
+  return (
+    <div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: T.color.ink70, marginBottom: 6 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: T.color.paper, border: `1.5px solid ${T.color.ink08}`, borderRadius: T.radius.sm, padding: '8px 12px' }}>
+        <button type="button" onClick={() => stepAndSet(value - step)}
+          style={{ width: 30, height: 30, borderRadius: 15, background: T.color.card, border: `1px solid ${T.color.ink08}`, fontSize: 16, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>−</button>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 6 }}>
+          <input
+            type="text"
+            inputMode={decimals > 0 ? 'decimal' : 'numeric'}
+            value={draft}
+            onChange={e => {
+              const raw = e.target.value.replace(/[^\d.]/g, '');
+              setDraft(raw);
+              const n = Number(raw);
+              if (raw !== '' && Number.isFinite(n)) setValue(n);
+            }}
+            onBlur={() => {
+              const n = Number(draft);
+              const v = Number.isFinite(n) ? round(clamp(n)) : round(clamp(value));
+              setValue(v); setDraft(String(v));
+            }}
+            className="cal-num"
+            style={{
+              width: 80, textAlign: 'center', fontSize: 18, fontWeight: 700,
+              background: 'transparent', border: 'none', outline: 'none',
+              color: T.color.ink, padding: 0, fontFamily: 'inherit',
+            }}
+          />
+          <span style={{ fontSize: 12, color: T.color.ink55, fontWeight: 700 }}>{unit}</span>
+        </div>
+        <button type="button" onClick={() => stepAndSet(value + step)}
+          style={{ width: 30, height: 30, borderRadius: 15, background: T.color.card, border: `1px solid ${T.color.ink08}`, fontSize: 16, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>+</button>
+      </div>
+    </div>
   );
 }

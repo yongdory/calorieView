@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { tokens as T } from '../lib/tokens';
 import { Card, IconBtn } from './ui/primitives';
 import { fetchFriendsToday, syncKakaoFriends, getKakaoToken, type FriendSummary } from '../lib/friends';
+import { supabase } from '../lib/supabase';
 
 interface Props {
   onBack: () => void;
@@ -25,6 +26,23 @@ export function FriendsView({ onBack, onOpenFriendDay }: Props) {
   }
 
   useEffect(() => { refresh().finally(() => setLoading(false)); }, []);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel('friends-meals-feed')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'meals' },
+        () => {
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => { refresh(); }, 500);
+        })
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   async function onSync() {
     setErr(null); setMsg(null);

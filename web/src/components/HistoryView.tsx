@@ -26,11 +26,12 @@ interface DailyAgg {
 }
 
 interface Props {
+  userId: string;
   targets: MacroTargets;
   onBack: () => void;
 }
 
-export function HistoryView({ targets, onBack }: Props) {
+export function HistoryView({ userId, targets, onBack }: Props) {
   const [range, setRange] = useState<Range>(7);
   const [meals, setMeals] = useState<MealRow[]>([]);
 
@@ -41,10 +42,11 @@ export function HistoryView({ targets, onBack }: Props) {
     supabase
       .from('meals')
       .select('id, eaten_at, total_kcal, total_carb_g, total_protein_g, total_fat_g')
+      .eq('user_id', userId)
       .gte('eaten_at', since.toISOString())
       .order('eaten_at', { ascending: true })
       .then(({ data }) => setMeals((data as MealRow[]) ?? []));
-  }, [range]);
+  }, [range, userId]);
 
   const daily = useMemo(() => buildDaily(meals, range), [meals, range]);
 

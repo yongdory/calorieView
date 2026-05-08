@@ -33,6 +33,7 @@ const foodEmoji = (name: string): string => {
 };
 
 interface Props {
+  userId: string;
   email: string;
   nickname?: string | null;
   targets: MacroTargets;
@@ -43,7 +44,7 @@ interface Props {
   refreshKey: number;
 }
 
-export function HomeView({ email: _email, nickname, targets, onPickPhoto, onOpenHistory, onOpenFriends, onOpenSettings, refreshKey }: Props) {
+export function HomeView({ userId, email: _email, nickname, targets, onPickPhoto, onOpenHistory, onOpenFriends, onOpenSettings, refreshKey }: Props) {
   const [meals, setMeals] = useState<MealRow[]>([]);
   const [photoSrc, setPhotoSrc] = useState<string | null>(null);
 
@@ -53,10 +54,11 @@ export function HomeView({ email: _email, nickname, targets, onPickPhoto, onOpen
     supabase
       .from('meals')
       .select('id, eaten_at, total_kcal, total_carb_g, total_protein_g, total_fat_g, items, image_url')
+      .eq('user_id', userId)
       .gte('eaten_at', today.toISOString())
       .order('eaten_at', { ascending: false })
       .then(({ data }) => setMeals((data as MealRow[]) ?? []));
-  }, [refreshKey]);
+  }, [refreshKey, userId]);
 
   const totals = meals.reduce(
     (acc, m) => ({

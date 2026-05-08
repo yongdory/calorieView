@@ -109,10 +109,11 @@ function Shell({ userId, email }: { userId: string; email: string }) {
 
   return (
     <>
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} hidden />
+      <input ref={fileRef} type="file" accept="image/*" onChange={onFile} hidden />
 
       {stage.kind === 'home' && (
         <HomeView
+          userId={userId}
           email={email}
           nickname={profile?.nickname}
           targets={targets}
@@ -134,7 +135,7 @@ function Shell({ userId, email }: { userId: string; email: string }) {
         />
       )}
       {stage.kind === 'history' && (
-        <HistoryView targets={targets} onBack={() => setStage({ kind: 'home' })} />
+        <HistoryView userId={userId} targets={targets} onBack={() => setStage({ kind: 'home' })} />
       )}
       {stage.kind === 'friends' && (
         <FriendsView

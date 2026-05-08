@@ -3,6 +3,7 @@ import { tokens as T } from '../lib/tokens';
 import { Card, IconBtn, FoodImg } from './ui/primitives';
 import { fetchFriendDay, type FriendMealRow, type FriendSummary } from '../lib/friends';
 import { PhotoModal } from './PhotoModal';
+import { supabase } from '../lib/supabase';
 
 interface Props {
   friend: FriendSummary;
@@ -38,6 +39,25 @@ export function FriendDayView({ friend, onBack }: Props) {
       .then(setMeals)
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : '불러오기 실패'))
       .finally(() => setLoading(false));
+  }, [friend.friend_id, date]);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel(`friend-day-${friend.friend_id}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'meals', filter: `user_id=eq.${friend.friend_id}` },
+        () => {
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => {
+            fetchFriendDay(friend.friend_id, date).then(setMeals).catch(() => { /* ignore */ });
+          }, 400);
+        })
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
   }, [friend.friend_id, date]);
 
   function shiftDate(days: number) {
